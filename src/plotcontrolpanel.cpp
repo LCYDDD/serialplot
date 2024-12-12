@@ -192,19 +192,23 @@ PlotControlPanel::~PlotControlPanel()
     delete ui;
 }
 
+// 获取样本数量
 unsigned PlotControlPanel::numOfSamples()
 {
+    // 返回用户界面中选择的样本数量
     return ui->spNumOfSamples->value();
 }
 
+// 当样本数量改变时触发
 void PlotControlPanel::onNumOfSamples(int value)
 {
+    // 如果启用了警告且新值超过了设定的阈值
     if (warnNumOfSamples && value > NUMSAMPLES_CONFIRM_AT)
     {
-        // ask confirmation
+        // 请求确认对话框
         if (!askNSConfirmation(value))
         {
-            // revert to old value
+            // 如果用户取消，则恢复到之前的值
             disconnect(ui->spNumOfSamples, SIGNAL(valueChanged(int)),
                        this, SLOT(onNumOfSamples(int)));
 
@@ -217,25 +221,29 @@ void PlotControlPanel::onNumOfSamples(int value)
         }
     }
 
+    // 更新内部存储的样本数量，并发出信号通知变化
     _numOfSamples = value;
     emit numOfSamplesChanged(value);
 }
 
+// 请求确认大样本数量设置
 bool PlotControlPanel::askNSConfirmation(int value)
 {
+    // 构建警告信息文本
     auto text = tr("Setting number of samples to a too big value "
                    "(>%1) can seriously impact the performance of "
                    "the application and cause freezes. Are you sure you "
                    "want to change the number of samples to %2?")
         .arg(QString::number(NUMSAMPLES_CONFIRM_AT), QString::number(value));
 
-    // TODO: parent the mainwindow
+    // 创建一个消息框，询问用户是否继续
     QMessageBox mb(QMessageBox::Warning,
                    tr("Confirm Number of Samples"),
                    text,
                    QMessageBox::Apply | QMessageBox::Cancel,
                    this);
 
+    // 添加复选框，允许用户不再显示此警告
     auto cb = new QCheckBox("Don't show this again.");
     connect(cb, &QCheckBox::stateChanged, [this](int state)
             {
@@ -244,37 +252,45 @@ bool PlotControlPanel::askNSConfirmation(int value)
 
     mb.setCheckBox(cb);
 
+    // 返回用户的选择（Apply 或 Cancel）
     return mb.exec() == QMessageBox::Apply;
 }
 
+// 设置颜色选择器的颜色
 void PlotControlPanel::setSelectorColor(QColor color)
 {
+    // 设置颜色选择按钮的背景色
     ui->pbColorSel->setStyleSheet(QString("background-color: %1;").arg(color.name()));
 }
 
+// 当选择颜色时触发
 void PlotControlPanel::onColorSelect()
 {
+    // 获取当前选择的行索引
     auto selection = ui->tvChannelInfo->selectionModel()->currentIndex();
-    // no selection
+    // 没有选择则直接返回
     if (!selection.isValid()) return;
 
-    // current color
+    // 从模型中获取当前颜色
     auto model = ui->tvChannelInfo->model();
     QColor color = model->data(selection, Qt::ForegroundRole).value<QColor>();
 
-    // show dialog
+    // 显示颜色选择对话框
     color = QColorDialog::getColor(color, this);
 
-    if (color.isValid())        // color is set to invalid if user cancels
+    // 如果用户选择了有效颜色，则更新模型中的颜色
+    if (color.isValid())
     {
         ui->tvChannelInfo->model()->setData(selection, color, Qt::ForegroundRole);
     }
 }
 
+// 当自动缩放选项被选中或取消时触发
 void PlotControlPanel::onAutoScaleChecked(bool checked)
 {
     if (checked)
     {
+        // 禁用Y轴范围控件并发出自动缩放信号
         ui->lYmin->setEnabled(false);
         ui->lYmax->setEnabled(false);
         ui->spYmin->setEnabled(false);
@@ -284,6 +300,7 @@ void PlotControlPanel::onAutoScaleChecked(bool checked)
     }
     else
     {
+        // 启用Y轴范围控件并发出手动缩放信号
         ui->lYmin->setEnabled(true);
         ui->lYmax->setEnabled(true);
         ui->spYmin->setEnabled(true);
@@ -293,56 +310,68 @@ void PlotControlPanel::onAutoScaleChecked(bool checked)
     }
 }
 
+// 当Y轴范围改变时触发
 void PlotControlPanel::onYScaleChanged()
 {
+    // 如果不是自动缩放，则发出新的Y轴范围信号
     if (!autoScale())
     {
         emit yScaleChanged(false, ui->spYmin->value(), ui->spYmax->value());
     }
 }
 
+// 检查是否启用了自动缩放
 bool PlotControlPanel::autoScale() const
 {
     return ui->cbAutoScale->isChecked();
 }
 
+// 获取Y轴最大值
 double PlotControlPanel::yMax() const
 {
     return ui->spYmax->value();
 }
 
+// 获取Y轴最小值
 double PlotControlPanel::yMin() const
 {
     return ui->spYmin->value();
 }
 
+// 检查是否使用索引作为X轴
 bool PlotControlPanel::xAxisAsIndex() const
 {
     return ui->cbIndex->isChecked();
 }
 
+// 获取X轴最大值
 double PlotControlPanel::xMax() const
 {
     return ui->spXmax->value();
 }
 
+// 获取X轴最小值
 double PlotControlPanel::xMin() const
 {
     return ui->spXmin->value();
 }
 
+// 当预设范围被选择时触发
 void PlotControlPanel::onRangeSelected()
 {
+    // 从组合框中获取选定的范围，并更新Y轴范围控件
     Range r = ui->cbRangePresets->currentData().value<Range>();
     ui->spYmin->setValue(r.rmin);
     ui->spYmax->setValue(r.rmax);
     ui->cbAutoScale->setChecked(false);
 }
 
+// 当索引作为X轴选项被选中或取消时触发
 void PlotControlPanel::onIndexChecked(bool checked)
 {
     if (checked)
     {
+        // 禁用X轴范围控件并发出使用索引信号
         ui->lXmin->setEnabled(false);
         ui->lXmax->setEnabled(false);
         ui->spXmin->setEnabled(false);
@@ -352,6 +381,7 @@ void PlotControlPanel::onIndexChecked(bool checked)
     }
     else
     {
+        // 启用X轴范围控件并发出手动缩放信号
         ui->lXmin->setEnabled(true);
         ui->lXmax->setEnabled(true);
         ui->spXmin->setEnabled(true);
@@ -362,8 +392,10 @@ void PlotControlPanel::onIndexChecked(bool checked)
     emit plotWidthChanged(plotWidth());
 }
 
+// 当X轴范围改变时触发
 void PlotControlPanel::onXScaleChanged()
 {
+    // 如果不是使用索引作为X轴，则发出新的X轴范围信号
     if (!xAxisAsIndex())
     {
         emit xScaleChanged(false, ui->spXmin->value(), ui->spXmax->value());
@@ -371,12 +403,13 @@ void PlotControlPanel::onXScaleChanged()
     }
 }
 
+// 计算绘图宽度
 double PlotControlPanel::plotWidth() const
 {
     double value = ui->spPlotWidth->value();
     if (!xAxisAsIndex())
     {
-        // scale by xmin and xmax
+        // 根据X轴范围缩放绘图宽度
         auto xmax = ui->spXmax->value();
         auto xmin = ui->spXmin->value();
         double scale = (xmax - xmin) / _numOfSamples;
@@ -385,20 +418,21 @@ double PlotControlPanel::plotWidth() const
     return value;
 }
 
+// 当绘图宽度改变时触发
 void PlotControlPanel::onPlotWidthChanged()
 {
     emit plotWidthChanged(plotWidth());
 }
 
+// 设置通道信息模型
 void PlotControlPanel::setChannelInfoModel(ChannelInfoModel* model)
 {
     ui->tvChannelInfo->setModel(model);
 
-    // channel color selector
+    // 连接选择模型的信号与槽，用于更新颜色选择器
     connect(ui->tvChannelInfo->selectionModel(), &QItemSelectionModel::currentRowChanged,
             [this](const QModelIndex &current, const QModelIndex &previous)
             {
-                // TODO: duplicate with below lambda
                 QColor color(0,0,0,0); // transparent
 
                 if (current.isValid())
@@ -425,6 +459,7 @@ void PlotControlPanel::setChannelInfoModel(ChannelInfoModel* model)
                 }
             });
 
+    // 当模型数据更改时，更新颜色选择器
     connect(model, &QAbstractItemModel::dataChanged,
             [this](const QModelIndex & topLeft, const QModelIndex & bottomRight, const QVector<int> & roles = QVector<int> ())
             {
@@ -438,7 +473,7 @@ void PlotControlPanel::setChannelInfoModel(ChannelInfoModel* model)
                 setSelectorColor(color);
             });
 
-    // reset actions
+    // 连接重置动作与模型方法
     connect(&resetAct, &QAction::triggered, model, &ChannelInfoModel::resetInfos);
     connect(&resetNamesAct, &QAction::triggered, model, &ChannelInfoModel::resetNames);
     connect(&resetColorsAct, &QAction::triggered, model, &ChannelInfoModel::resetColors);
@@ -448,6 +483,7 @@ void PlotControlPanel::setChannelInfoModel(ChannelInfoModel* model)
     connect(&hideAllAct, &QAction::triggered, [model]{model->resetVisibility(false);});
 }
 
+// 保存设置到QSettings对象
 void PlotControlPanel::saveSettings(QSettings* settings)
 {
     settings->beginGroup(SettingGroup_Plot);
@@ -463,6 +499,7 @@ void PlotControlPanel::saveSettings(QSettings* settings)
     settings->endGroup();
 }
 
+// 从QSettings对象加载设置
 void PlotControlPanel::loadSettings(QSettings* settings)
 {
     settings->beginGroup(SettingGroup_Plot);

@@ -1,22 +1,3 @@
-/*
-  Copyright © 2023 Hasan Yavuz Özderya
-
-  This file is part of serialplot.
-
-  serialplot is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  serialplot is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with serialplot.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
 #include <QByteArray>
@@ -51,7 +32,7 @@
 Q_IMPORT_PLUGIN(QWindowsIntegrationPlugin)
 #endif
 
-// TODO: depends on tab insertion order, a better solution would be to use object names
+// 面板设置的映射，保持面板顺序一致
 const QMap<int, QString> panelSettingMap({
         {0, "Port"},
         {1, "DataFormat"},
@@ -64,37 +45,42 @@ const QMap<int, QString> panelSettingMap({
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
-    ui(new Ui::MainWindow),
+    ui(new Ui::MainWindow), // 初始化 UI
     aboutDialog(this),
     portControl(&serialPort),
-    secondaryPlot(NULL),
-    snapshotMan(this, &stream),
+    secondaryPlot(NULL), // 初始化副图
+    snapshotMan(this, &stream), // 快照管理器
     commandPanel(&serialPort),
     dataFormatPanel(&serialPort),
     recordPanel(&stream),
     textView(&stream),
     updateCheckDialog(this),
-    bpsLabel(&portControl, &dataFormatPanel, this)
+    bpsLabel(&portControl, &dataFormatPanel, this) // 初始化比特率标签
 {
-    ui->setupUi(this);
+    ui->setupUi(this); // 设置 UI
 
-    plotMan = new PlotManager(ui->plotArea, &plotMenu, &stream);
+    plotMan = new PlotManager(ui->plotArea, &plotMenu, &stream); // 初始化绘图管理器
 
+    // 在选项卡中添加控制面板
     ui->tabWidget->insertTab(0, &portControl, "Port");
     ui->tabWidget->insertTab(1, &dataFormatPanel, "Data Format");
     ui->tabWidget->insertTab(2, &plotControlPanel, "Plot");
     ui->tabWidget->insertTab(3, &commandPanel, "Commands");
     ui->tabWidget->insertTab(4, &recordPanel, "Record");
     ui->tabWidget->insertTab(5, &textView, "Text View");
-    ui->tabWidget->setCurrentIndex(0);
+    ui->tabWidget->setCurrentIndex(0); // 设置默认显示面板为端口控制面板
+
+    // 添加工具栏
     auto tbPortControl = portControl.toolBar();
     addToolBar(tbPortControl);
     addToolBar(recordPanel.toolbar());
 
+    // 将快照和命令面板加入菜单栏
     ui->plotToolBar->addAction(snapshotMan.takeSnapshotAction());
     menuBar()->insertMenu(ui->menuHelp->menuAction(), snapshotMan.menu());
     menuBar()->insertMenu(ui->menuHelp->menuAction(), commandPanel.menu());
 
+    // 连接命令面板的信号，切换到命令面板
     connect(&commandPanel, &CommandPanel::focusRequested, [this]()
             {
                 this->ui->tabWidget->setCurrentWidget(&commandPanel);
@@ -104,39 +90,39 @@ MainWindow::MainWindow(QWidget *parent) :
     tbPortControl->setObjectName("tbPortControl");
     ui->plotToolBar->setObjectName("tbPlot");
 
-    setupAboutDialog();
+    setupAboutDialog(); // 设置关于对话框
 
-    // init view menu
+    // 初始化视图菜单
     ui->menuBar->insertMenu(ui->menuSecondary->menuAction(), &plotMenu);
     plotMenu.addSeparator();
     QMenu* tbMenu = plotMenu.addMenu("Toolbars");
     tbMenu->addAction(ui->plotToolBar->toggleViewAction());
     tbMenu->addAction(portControl.toolBar()->toggleViewAction());
 
-    // init secondary plot menu
+    // 初始化副绘图菜单
     auto group = new QActionGroup(this);
     group->addAction(ui->actionVertical);
     group->addAction(ui->actionHorizontal);
 
-    // init UI signals
+    // 连接信号槽
 
-    // Secondary plot menu signals
+    // 副绘图菜单信号
     connect(ui->actionBarPlot, &QAction::triggered,
             this, &MainWindow::showBarPlot);
 
     connect(ui->actionVertical, &QAction::triggered,
             [this](bool checked)
             {
-                if (checked) ui->splitter->setOrientation(Qt::Vertical);
+                if (checked) ui->splitter->setOrientation(Qt::Vertical); // 垂直显示
             });
 
     connect(ui->actionHorizontal, &QAction::triggered,
             [this](bool checked)
             {
-                if (checked) ui->splitter->setOrientation(Qt::Horizontal);
+                if (checked) ui->splitter->setOrientation(Qt::Horizontal); // 水平显示
             });
 
-    // Help menu signals
+    // 帮助菜单信号
     QObject::connect(ui->actionHelpAbout, &QAction::triggered,
               &aboutDialog, &QWidget::show);
 
@@ -146,7 +132,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(ui->actionReportBug, &QAction::triggered,
                      [](){QDesktopServices::openUrl(QUrl(BUG_REPORT_URL));});
 
-    // File menu signals
+    // 文件菜单信号
     QObject::connect(ui->actionExportCsv, &QAction::triggered,
                      this, &MainWindow::onExportCsv);
 
@@ -164,11 +150,11 @@ MainWindow::MainWindow(QWidget *parent) :
     QObject::connect(ui->actionQuit, &QAction::triggered,
                      this, &MainWindow::close);
 
-    // port control signals
+    // 端口控制信号
     QObject::connect(&portControl, &PortControl::portToggled,
                      this, &MainWindow::onPortToggled);
 
-    // plot control signals
+    // 绘图控制信号
     connect(&plotControlPanel, &PlotControlPanel::numOfSamplesChanged,
             this, &MainWindow::onNumOfSamplesChanged);
 
@@ -190,7 +176,7 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(&plotControlPanel, &PlotControlPanel::lineThicknessChanged,
             plotMan, &PlotManager::setLineThickness);
 
-    // plot toolbar signals
+    // 绘图工具栏信号
     QObject::connect(ui->actionClear, SIGNAL(triggered(bool)),
                      this, SLOT(clearPlot()));
 
@@ -225,12 +211,12 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(&serialPort, &QIODevice::aboutToClose,
             &recordPanel, &RecordPanel::onPortClose);
 
-    // init plot
+    // 初始化绘图
     numOfSamples = plotControlPanel.numOfSamples();
     stream.setNumSamples(numOfSamples);
     plotControlPanel.setChannelInfoModel(stream.infoModel());
 
-    // init scales
+    // 初始化坐标轴
     stream.setXAxis(plotControlPanel.xAxisAsIndex(),
                     plotControlPanel.xMin(), plotControlPanel.xMax());
 
@@ -241,15 +227,16 @@ MainWindow::MainWindow(QWidget *parent) :
     plotMan->setNumOfSamples(numOfSamples);
     plotMan->setPlotWidth(plotControlPanel.plotWidth());
 
-    // init bps (bits per second) counter
+    // 初始化比特率（bps）计数器
     ui->statusBar->addPermanentWidget(&bpsLabel);
 
-    // Init sps (sample per second) counter
+    // 初始化每秒样本数（sps）计数器
     spsLabel.setText("0sps");
-    spsLabel.setToolTip(tr("samples per second (per channel)"));
+    spsLabel.setToolTip(tr("每通道每秒样本数"));
     ui->statusBar->addPermanentWidget(&spsLabel);
     connect(&sampleCounter, &SampleCounter::spsChanged,
             this, &MainWindow::onSpsChanged);
+
 
     bpsLabel.setMinimumWidth(70);
     bpsLabel.setAlignment(Qt::AlignRight);
@@ -290,6 +277,7 @@ MainWindow::MainWindow(QWidget *parent) :
             });
 }
 
+//析构函数，用于清理资源（如关闭串口和销毁 plotMan）并释放内存。
 MainWindow::~MainWindow()
 {
     if (serialPort.isOpen())
@@ -303,6 +291,7 @@ MainWindow::~MainWindow()
     ui = NULL; // we check if ui is deleted in messageHandler
 }
 
+//重写 QCloseEvent，处理窗口关闭事件。在关闭窗口时，保存设置、检查未保存的快照、关闭串口等。
 void MainWindow::closeEvent(QCloseEvent * event)
 {
     // save snapshots
@@ -355,7 +344,7 @@ Try fixing the permissions of file: %1, or just delete it.").arg(file);
 
     QMainWindow::closeEvent(event);
 }
-
+//设置 "关于" 对话框，显示应用程序的版本和其他相关信息，并为 "关于 Qt" 按钮连接信号。
 void MainWindow::setupAboutDialog()
 {
     Ui_AboutDialog uiAboutDialog;
@@ -369,7 +358,7 @@ void MainWindow::setupAboutDialog()
     aboutText.replace("$VERSION_REVISION$", VERSION_REVISION);
     uiAboutDialog.lbAbout->setText(aboutText);
 }
-
+//处理串口打开/关闭的操作。如果打开串口并启用了模拟模式，则禁用模拟模式。关闭串口时，重置 spsLabel。
 void MainWindow::onPortToggled(bool open)
 {
     // make sure demo mode is disabled
@@ -381,37 +370,37 @@ void MainWindow::onPortToggled(bool open)
         spsLabel.setText("0sps");
     }
 }
-
+//当数据源发生变化时调用，连接新的数据源到 stream 和 sampleCounter
 void MainWindow::onSourceChanged(Source* source)
 {
     source->connectSink(&stream);
     source->connectSink(&sampleCounter);
 }
-
+//清空绘图数据并重新绘制图形。
 void MainWindow::clearPlot()
 {
     stream.clear();
     plotMan->replot();
 }
-
+//当采样数量发生变化时更新 stream 和 plotMan 的配置。
 void MainWindow::onNumOfSamplesChanged(int value)
 {
     numOfSamples = value;
     stream.setNumSamples(value);
     plotMan->replot();
 }
-
+//更新每秒采样数（sps）的显示。
 void MainWindow::onSpsChanged(float sps)
 {
     int precision = sps < 1. ? 3 : 0;
     spsLabel.setText(QString::number(sps, 'f', precision) + "sps");
 }
-
+//判断模拟模式是否正在运行。
 bool MainWindow::isDemoRunning()
 {
     return ui->actionDemoMode->isChecked();
 }
-
+//启用或禁用模拟模式。如果启用模拟模式并且串口未打开，则开启模拟；如果串口已打开，则禁用模拟模式。
 void MainWindow::enableDemo(bool enabled)
 {
     if (enabled)
@@ -432,6 +421,7 @@ void MainWindow::enableDemo(bool enabled)
     }
 }
 
+//显示一个次要的绘图窗口（wid），并将其添加到主窗口的 splitter 中。
 void MainWindow::showSecondary(QWidget* wid)
 {
     if (secondaryPlot != NULL)
@@ -444,7 +434,7 @@ void MainWindow::showSecondary(QWidget* wid)
     ui->splitter->setStretchFactor(0, 1);
     ui->splitter->setStretchFactor(1, 0);
 }
-
+//隐藏当前显示的次要绘图窗口，并删除该窗口。
 void MainWindow::hideSecondary()
 {
     if (secondaryPlot == NULL)
@@ -456,6 +446,7 @@ void MainWindow::hideSecondary()
     secondaryPlot = NULL;
 }
 
+//显示或隐藏条形图绘图窗口。如果显示，创建一个 BarPlot 实例并配置 Y 轴范围，然后调用 showSecondary() 显示它。
 void MainWindow::showBarPlot(bool show)
 {
     if (show)
@@ -473,7 +464,7 @@ void MainWindow::showBarPlot(bool show)
         hideSecondary();
     }
 }
-
+//导出当前绘图的数据为 CSV 文件。如果绘图正在暂停，则暂停绘图，弹出保存文件对话框，保存数据为 CSV 格式。
 void MainWindow::onExportCsv()
 {
     bool wasPaused = ui->actionPause->isChecked();
@@ -492,7 +483,7 @@ void MainWindow::onExportCsv()
         delete snapshot;
     }
 }
-
+//导出当前绘图为 SVG 文件。如果绘图正在暂停，则暂停绘图，弹出保存文件对话框，保存数据为 SVG 格式。
 void MainWindow::onExportSvg()
 {
     bool wasPaused = ui->actionPause->isChecked();
@@ -511,11 +502,13 @@ void MainWindow::onExportSvg()
     }
 }
 
+//返回当前视图的设置（用于绘图）。
 PlotViewSettings MainWindow::viewSettings() const
 {
     return plotMenu.viewSettings();
 }
 
+//自定义的日志处理函数，用于显示调试信息和日志消息。如果不是调试信息，则在状态栏显示该消息。
 void MainWindow::messageHandler(QtMsgType type,
                                 const QString &logString,
                                 const QString &msg)
@@ -528,7 +521,7 @@ void MainWindow::messageHandler(QtMsgType type,
         ui->statusBar->showMessage(msg, 5000);
     }
 }
-
+//保存所有面板和设置的配置，包括窗口的大小、位置、面板状态、串口设置、绘图设置等。
 void MainWindow::saveAllSettings(QSettings* settings)
 {
     saveMWSettings(settings);
@@ -543,6 +536,7 @@ void MainWindow::saveAllSettings(QSettings* settings)
     updateCheckDialog.saveSettings(settings);
 }
 
+//加载所有面板和设置的配置。
 void MainWindow::loadAllSettings(QSettings* settings)
 {
     loadMWSettings(settings);
@@ -556,7 +550,7 @@ void MainWindow::loadAllSettings(QSettings* settings)
     textView.loadSettings(settings);
     updateCheckDialog.loadSettings(settings);
 }
-
+//保存主窗口的设置，如窗口的大小、位置、最大化状态、当前面板等。
 void MainWindow::saveMWSettings(QSettings* settings)
 {
     // save window geometry
@@ -576,7 +570,7 @@ void MainWindow::saveMWSettings(QSettings* settings)
     settings->setValue(SG_MainWindow_State, saveState());
     settings->endGroup();
 }
-
+//加载主窗口的设置，如窗口的大小、位置、最大化状态、当前面板等。
 void MainWindow::loadMWSettings(QSettings* settings)
 {
     settings->beginGroup(SettingGroup_MainWindow);
@@ -607,7 +601,7 @@ void MainWindow::loadMWSettings(QSettings* settings)
 
     settings->endGroup();
 }
-
+//打开一个文件对话框，允许用户保存当前设置到一个配置文件（INI 格式）。
 void MainWindow::onSaveSettings()
 {
     QString fileName = QFileDialog::getSaveFileName(
@@ -619,7 +613,7 @@ void MainWindow::onSaveSettings()
         saveAllSettings(&settings);
     }
 }
-
+//打开一个文件对话框，允许用户加载一个配置文件（INI 格式）并应用设置
 void MainWindow::onLoadSettings()
 {
     QString fileName = QFileDialog::getOpenFileName(
@@ -632,6 +626,7 @@ void MainWindow::onLoadSettings()
     }
 }
 
+//处理命令行选项，如加载配置文件、设置串口、波特率和打开串口。
 void MainWindow::handleCommandLineOptions(const QCoreApplication &app)
 {
     QCommandLineParser parser;
